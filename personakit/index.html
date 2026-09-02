@@ -90,6 +90,12 @@
   input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
   .ledger { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; font-size: 14px; max-width: 460px; }
   .ledger .v { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+  .preset { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .preset label { padding: 8px 14px; font-size: 14px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
+  .preset label + label { border-left: 1px solid var(--line); }
+  .preset input { margin: 0; accent-color: var(--accent); }
+  .preset label.on { background: var(--accent-soft); }
+  .presetrow { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
   .notice { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 14px; }
   .notice strong { color: var(--warn); }
 
@@ -138,6 +144,13 @@
       <div><span class="v" id="st-sessions">0</span><span class="k">sessions</span></div>
       <div><span class="v" id="st-context">0</span><span class="k">assistant replies, kept only as context</span></div>
     </div>
+    <div class="presetrow">
+      <div class="preset" role="radiogroup" aria-label="Which sessions to include">
+        <label class="on"><input type="radio" name="order" value="richest" checked> Richest sessions</label>
+        <label><input type="radio" name="order" value="newest"> Most recent</label>
+      </div>
+      <span class="quiet">Run once with each to send two batches: how you work, and what you're in the middle of.</span>
+    </div>
     <p class="quiet" id="selection-note"></p>
     <div class="tablewrap">
       <table>
@@ -155,10 +168,10 @@
   <section id="s-save" hidden>
     <h2><span class="n">3</span>Save the file and send it</h2>
     <div class="saverow">
-      <button class="primary" id="save" disabled>Save personakit-corpus.txt</button>
+      <button class="primary" id="save" disabled>Save personakit-corpus-richest.txt</button>
       <span class="status" id="save-status"></span>
     </div>
-    <p class="quiet">One file. Send it however you'd send any file. Nothing else was read or written anywhere.</p>
+    <p class="quiet">One file per batch. Send it however you'd send any file. Nothing else was read or written anywhere.</p>
   </section>
 
   <footer>
@@ -272,14 +285,16 @@
     return null;
   }
 
-  // Window = the maxSessions most recent; within it, richest first (ties:
-  // newer first); whole sessions; greedy fill, skipping what would not fit.
-  function selectSessions(rows, maxSessions, maxTurns) {
+  // Window = the maxSessions most recent. Then "richest" (most turns first,
+  // ties newer first) or "newest". Whole sessions; greedy fill, skipping
+  // what would not fit.
+  function selectSessions(rows, maxSessions, maxTurns, order) {
+    order = order || "richest";
     var window_ = rows.slice().sort(function (a, b) { return b.mtime - a.mtime; });
     if (maxSessions !== null && maxSessions !== undefined) window_ = window_.slice(0, maxSessions);
-    var ordered = window_.slice().sort(function (a, b) {
-      return (b.human_turns - a.human_turns) || (b.mtime - a.mtime);
-    });
+    var ordered = order === "richest"
+      ? window_.slice().sort(function (a, b) { return (b.human_turns - a.human_turns) || (b.mtime - a.mtime); })
+      : window_;
     if (maxTurns === null || maxTurns === undefined) return ordered;
     var chosen = [], total = 0;
     for (var i = 0; i < ordered.length; i++) {
@@ -356,7 +371,7 @@
       } else if (argv[0] === "--session-slugs") {
         process.stdout.write(JSON.stringify(argv.slice(1).map(sessionSlug)));
       } else if (argv[0] === "--select") {
-        var sel = selectSessions(JSON.parse(argv[3]), parseInt(argv[1], 10), parseInt(argv[2], 10));
+        var sel = selectSessions(JSON.parse(argv[3]), parseInt(argv[1], 10), parseInt(argv[2], 10), argv[4]);
         process.stdout.write(JSON.stringify(sel.map(function (r) { return r.id; })));
       } else {
         var lines = fs.readFileSync(argv[0], "utf8").split("\n");
@@ -473,13 +488,28 @@
     })();
   }
 
+  var order = "richest";
+  var NOTES = {
+    richest: "Your richest recent sessions: of the " + MAX_SESSIONS + " most recently touched, the ones where you typed the most, " +
+             "filling up to " + MAX_TURNS + " of your turns. Corrections live in long back-and-forths, which is why size wins over date.",
+    newest:  "Your most recent sessions, newest first, filling up to " + MAX_TURNS + " of your turns. " +
+             "This batch is about what you are in the middle of."
+  };
+
   function finish() {
+    applyPreset(order);
+    $("s-review").hidden = false; $("s-save").hidden = false;
+    $("s-review").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function applyPreset(which) {
+    order = which;
+    sessions.forEach(function (s) { s.checked = false; });
     var admitted = sessions.filter(function (s) { return s.humanTurns >= N.MIN_HUMAN_TURNS; });
     var rows = admitted.map(function (s) { return { ref: s, human_turns: s.humanTurns, mtime: s.mtime }; });
-    N.selectSessions(rows, MAX_SESSIONS, MAX_TURNS).forEach(function (r) { r.ref.checked = true; });
-    // Show in the order the rule considered them: the recency window first
-    // (newest MAX_SESSIONS), richest at the top, so the ticks cluster.
-    var inWindow = N.selectSessions(rows, MAX_SESSIONS, null).map(function (r) { return r.ref; });
+    N.selectSessions(rows, MAX_SESSIONS, MAX_TURNS, order).forEach(function (r) { r.ref.checked = true; });
+    // Show in the order the rule considered them, so the ticks cluster at the top.
+    var inWindow = N.selectSessions(rows, MAX_SESSIONS, null, order).map(function (r) { return r.ref; });
     var outside = admitted.filter(function (s) { return inWindow.indexOf(s) === -1; })
                           .sort(function (a, b) { return b.mtime - a.mtime; });
     admitted = inWindow.concat(outside);
@@ -487,15 +517,19 @@
     progress.textContent = seen.files.toLocaleString() + " files seen, " + seen.jsonl.toLocaleString() + " transcripts, " +
       sessions.length + " sessions (the rest are subagent sidecars). " + admitted.length + " have at least " +
       N.MIN_HUMAN_TURNS + " of your turns" + (thin ? "; " + thin + " were too thin to use." : ".");
-    $("selection-note").textContent = "Your richest recent sessions: of the " + MAX_SESSIONS + " most recently touched, the ones " +
-      "where you typed the most, filling up to " + MAX_TURNS + " of your turns. Corrections live in long back-and-forths, " +
-      "which is why size wins over date. Untick any session you'd rather keep out; tick one to add it.";
+    $("selection-note").textContent = NOTES[order] + " Untick any session you'd rather keep out; tick one to add it.";
+    saveBtn.textContent = "Save personakit-corpus-" + order + ".txt";
     renderRows(admitted);
     renderLedger();
-    $("s-review").hidden = false; $("s-save").hidden = false;
     update();
-    $("s-review").scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="order"]'), function (radio) {
+    radio.addEventListener("change", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".preset label"), function (l) { l.classList.toggle("on", l.contains(radio)); });
+      if (sessions.length) applyPreset(radio.value);
+    });
+  });
 
   function renderRows(admitted) {
     rowsEl.innerHTML = "";
@@ -556,7 +590,7 @@
     window.claude.use("downloads").then(function (d) { downloads = d; }, function () { downloads = null; });
   }
   saveBtn.addEventListener("click", function () {
-    var data = corpusText(), name = "personakit-corpus.txt";   // .jsonl is not on the host's save allowlist; content is still one JSON object per line
+    var data = corpusText(), name = "personakit-corpus-" + order + ".txt";   // .jsonl is not on the host's save allowlist; content is still one JSON object per line
     saveStatus.textContent = "Saving\u2026";
     if (downloads) {
       downloads.save({ filename: name, data: data }).then(function () {
