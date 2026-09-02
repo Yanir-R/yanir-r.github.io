@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>PersonaKit Connect</title>
+<style>
+  :root {
+    --bg: #F7F8F6;
+    --surface: #FFFFFF;
+    --ink: #1C2321;
+    --muted: #6B7470;
+    --line: #DDE2DF;
+    --accent: #1F6F5F;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E3F0EC;
+    --warn: #B7791F;
+    --warn-soft: #FBF1DF;
+    --drop-bg: #F0F3F1;
+    /* System faces only: the page promises zero network requests, and a
+       person may open devtools to check. A font link is a request. */
+    --serif: "Iowan Old Style", "Charter", "Palatino", Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141816; --surface: #1B201E; --ink: #E6EAE7; --muted: #8E9893;
+      --line: #2C3330; --accent: #5FBFA8; --accent-ink: #0F1512; --accent-soft: #1E2F2A;
+      --warn: #D9A441; --warn-soft: #2E2716; --drop-bg: #181D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141816; --surface: #1B201E; --ink: #E6EAE7; --muted: #8E9893;
+    --line: #2C3330; --accent: #5FBFA8; --accent-ink: #0F1512; --accent-soft: #1E2F2A;
+    --warn: #D9A441; --warn-soft: #2E2716; --drop-bg: #181D1B;
+  }
+
+  html { color-scheme: light dark; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; display: grid; gap: 40px; }
+
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 38px; line-height: 1.12; margin: 0 0 14px; text-wrap: balance; letter-spacing: -0.01em; }
+  h2 { font-family: var(--serif); font-weight: 600; font-size: 22px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 12px; }
+  h2 .n { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--muted); }
+  p { margin: 0; max-width: 62ch; }
+  p + p { margin-top: 10px; }
+  .lede { font-size: 17px; color: var(--muted); }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  code { background: var(--drop-bg); padding: 1px 5px; border-radius: 3px; }
+  section { display: grid; gap: 16px; }
+  .quiet { color: var(--muted); font-size: 14px; }
+
+  /* 1. Drop */
+  .drop {
+    border: 2px dashed var(--line); border-radius: 6px; background: var(--drop-bg);
+    padding: 44px 24px; text-align: center; display: grid; gap: 10px; justify-items: center;
+    transition: border-color .15s, background .15s; cursor: pointer;
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .drop .big { font-family: var(--serif); font-size: 22px; }
+  .drop input { display: none; }
+  .where { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+  .where code { color: var(--ink); }
+  .progress { font-family: var(--mono); font-size: 13px; color: var(--muted); min-height: 1.4em; }
+
+  /* 2. Review */
+  .stat { display: flex; gap: 32px; flex-wrap: wrap; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .stat div { display: grid; gap: 2px; }
+  .stat .v { font-family: var(--serif); font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .stat .v.accent { color: var(--accent); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-weight: 500; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+  td.id { font-family: var(--mono); color: var(--muted); }
+  tr.off td { color: var(--muted); }
+  tr.off td:not(.chk) { text-decoration: line-through; text-decoration-color: var(--line); }
+  input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+  .ledger { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; font-size: 14px; max-width: 460px; }
+  .ledger .v { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+  .notice { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 14px; }
+  .notice strong { color: var(--warn); }
+
+  /* 3. Save */
+  button.primary {
+    font: 500 16px var(--sans); color: var(--accent-ink); background: var(--accent);
+    border: 0; border-radius: 6px; padding: 12px 22px; cursor: pointer;
+  }
+  button.primary:disabled { opacity: .45; cursor: default; }
+  button.primary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .saverow { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .status { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); padding-top: 20px; font-size: 14px; color: var(--muted); display: grid; gap: 8px; }
+  footer ul { margin: 0; padding-left: 18px; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .drop { transition: none; } }
+</style>
+
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">PersonaKit</p>
+    <h1>Your words, from your Claude Code sessions</h1>
+    <p class="lede">This page reads your session files here in your browser, keeps only what you typed, and gives you one small file to send. Nothing leaves this page until you save that file.</p>
+  </header>
+
+  <section id="s-drop">
+    <h2><span class="n">1</span>Drop your Claude Code folder</h2>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose your Claude Code projects folder">
+      <div class="big">Drop the folder here, or click to choose it</div>
+      <div class="where">
+        <span>It lives at <code>~/.claude/projects</code></span>
+        <span class="quiet">In the file dialog, press <code>&#8984;&#8679;G</code> and paste that path. Dropping <code>~/.claude</code> works too.</span>
+      </div>
+      <input type="file" id="picker" webkitdirectory directory multiple>
+    </div>
+    <div class="progress" id="progress"></div>
+  </section>
+
+  <section id="s-review" hidden>
+    <h2><span class="n">2</span>Check what would be sent</h2>
+    <div class="stat">
+      <div><span class="v accent" id="st-turns">0</span><span class="k">of your turns</span></div>
+      <div><span class="v" id="st-sessions">0</span><span class="k">sessions</span></div>
+      <div><span class="v" id="st-context">0</span><span class="k">assistant replies, kept only as context</span></div>
+    </div>
+    <p class="quiet" id="selection-note"></p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="chk"></th><th>project</th><th>session</th><th>from</th><th>to</th><th class="num">your turns</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div>
+      <p class="quiet" style="margin-bottom:8px">Discarded before anything is written, by reason:</p>
+      <div class="ledger" id="ledger"></div>
+    </div>
+    <div class="notice"><strong>This does not make the file clean.</strong> It removes the machine parts. If you typed a token, a client's name or something about someone else into a prompt, that is still in there. The file is plain text, one line per turn &mdash; open it and delete any line before you send it.</div>
+  </section>
+
+  <section id="s-save" hidden>
+    <h2><span class="n">3</span>Save the file and send it</h2>
+    <div class="saverow">
+      <button class="primary" id="save" disabled>Save personakit-corpus.txt</button>
+      <span class="status" id="save-status"></span>
+    </div>
+    <p class="quiet">One file. Send it however you'd send any file. Nothing else was read or written anywhere.</p>
+  </section>
+
+  <footer>
+    <span>Never included, by rule:</span>
+    <ul>
+      <li>tool output, file contents and diffs</li>
+      <li>the assistant's private reasoning</li>
+      <li>screenshots and pasted blocks</li>
+      <li>file paths, branch names, your username</li>
+      <li>subagent transcripts and messages from other agent sessions</li>
+    </ul>
+    <span>This page makes no network requests. You can verify that in your browser's developer tools.</span>
+  </footer>
+</main>
+
+<script>/*
+ * Normalise Claude Code transcript records into corpus records, in the browser.
+ *
+ * A rule-for-rule port of the reference normaliser, held equal to it by a test
+ * that runs one fixture through both and requires byte-identical output. If a
+ * rule changes on one side, change the other, or the test says so. The reasons
+ * behind each rule live with the reference; this file says only what it does.
+ *
+ * Runs two ways:
+ *   in a page:   window.PersonaKitNormalise = { normalise, projectLabel, ... }
+ *   under node:  node normalise.js fixture.jsonl      -> {"records": [...], "stats": {...}}
+ *                node normalise.js --labels a b c     -> ["...", ...]
+ */
+(function (root) {
+  "use strict";
+
+  var SOURCE = "claude-code";
+  var MIN_HUMAN_TURNS = 5;
+  var PASTE_TOKEN_MIN = 32;
+  var PASTE_SHARE = 0.5;
+
+  // A `user` record that STARTS with one of these is scaffolding, not speech.
+  var ENVELOPES = ["<command-name>", "<local-command", "Caveat:", "<system-reminder>",
+                   "<command-message>", "<command-args>", "<task-notification>",
+                   "[Request interrupted", "<user-prompt-submit-hook>",
+                   "<function_results>", "<task-id>", "API Error", "<bash-"];
+
+  var INJECTED_BLOCK = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
+  var HOME_PATH = /(?:\/Users|\/home)\/[^\/\s`'",;:.)\]]+(?=\/|[\s`'",;:.)\]]|$)/g;
+  var HOME_SLUG = /(?<![A-Za-z0-9])-(?:Users|home)-[^-\s`'",;:.)\]]+(?=-|[\s`'",;:.)\]]|$)/g;
+  var HOME_PREFIX = /^-(Users|home)-[^-]+-?/;
+
+  function isPaste(text) {
+    var tokens = text.split(/\s+/).filter(function (t) { return t.length > 0; });
+    if (tokens.length === 0) return true;
+    var longest = tokens.reduce(function (a, b) { return b.length > a.length ? b : a; }, "");
+    return longest.length >= PASTE_TOKEN_MIN && longest.length / text.length > PASTE_SHARE;
+  }
+
+  function hasToolResultBlock(content) {
+    return Array.isArray(content) && content.some(function (b) {
+      return b && typeof b === "object" && b.type === "tool_result";
+    });
+  }
+
+  function harnessAuthored(record) {
+    if (record.isMeta === true || record.isCompactSummary === true) return true;
+    var origin = record.origin;
+    return !!(origin && typeof origin === "object" && origin.kind === "peer");
+  }
+
+  function startsWithEnvelope(text) {
+    for (var i = 0; i < ENVELOPES.length; i++) {
+      if (text.indexOf(ENVELOPES[i]) === 0) return true;
+    }
+    return false;
+  }
+
+  function humanText(content) {
+    if (Array.isArray(content)) {
+      content = content.filter(function (b) { return b && b.type === "text"; })
+                       .map(function (b) { return b.text || ""; })
+                       .join("\n");
+    }
+    if (typeof content !== "string") return content;
+    var text = content.replace(INJECTED_BLOCK, "").trim();
+    if (startsWithEnvelope(text)) return "";
+    return text;
+  }
+
+  function visibleText(blocks) {
+    if (!Array.isArray(blocks)) return blocks;
+    return blocks.filter(function (b) { return b && b.type === "text"; })
+                 .map(function (b) { return b.text || ""; })
+                 .filter(function (p) { return p.length > 0; })
+                 .join("\n");
+  }
+
+  function scrubHomePaths(text) {
+    return text.replace(HOME_PATH, "~").replace(HOME_SLUG, "~");
+  }
+
+  function projectLabel(slug) {
+    return slug.replace(HOME_PREFIX, "") || "home";
+  }
+
+  // What counts as a session file, from a relative path as the browser sees
+  // it after a folder drop. Same rule as the Python, held equal by test.
+  function sessionSlug(relpath) {
+    if (!/\.jsonl$/.test(relpath) || relpath.indexOf("/subagents/") !== -1) return null;
+    var parts = relpath.split("/");
+    var i = parts.indexOf("projects");
+    if (i >= 0) return parts.length === i + 3 ? parts[i + 1] : null;
+    if (parts.length === 3) return parts[1];
+    if (parts.length === 2) return parts[0];
+    return null;
+  }
+
+  // Window = the maxSessions most recent; within it, richest first (ties:
+  // newer first); whole sessions; greedy fill, skipping what would not fit.
+  function selectSessions(rows, maxSessions, maxTurns) {
+    var window_ = rows.slice().sort(function (a, b) { return b.mtime - a.mtime; });
+    if (maxSessions !== null && maxSessions !== undefined) window_ = window_.slice(0, maxSessions);
+    var ordered = window_.slice().sort(function (a, b) {
+      return (b.human_turns - a.human_turns) || (b.mtime - a.mtime);
+    });
+    if (maxTurns === null || maxTurns === undefined) return ordered;
+    var chosen = [], total = 0;
+    for (var i = 0; i < ordered.length; i++) {
+      if (total + ordered[i].human_turns > maxTurns) continue;
+      chosen.push(ordered[i]); total += ordered[i].human_turns;
+    }
+    return chosen;
+  }
+
+  function nul(v) { return v === undefined ? null : v; }
+
+  function corpusRecord(record, text) {
+    return {
+      type: nul(record.type),
+      content: scrubHomePaths(text),
+      timestamp: nul(record.timestamp),
+      source: SOURCE,
+      session_id: nul(record.sessionId)
+    };
+  }
+
+  function normalise(records, stats) {
+    stats = stats || {};
+    function count(reason) { stats[reason] = (stats[reason] || 0) + 1; }
+    var out = [];
+    var pendingReply = null;
+    for (var i = 0; i < records.length; i++) {
+      var record = records[i];
+      if (record.isSidechain) { count("sidechain"); continue; }
+      var kind = record.type;
+      if (kind === "user") {
+        var content = (record.message || {}).content;
+        if ((record.toolUseResult !== undefined && record.toolUseResult !== null) || hasToolResultBlock(content)) {
+          count("tool_result"); continue;
+        }
+        if (harnessAuthored(record)) { count("harness"); continue; }
+        var text = humanText(content);
+        if (!text) { count("scaffolding_or_empty"); continue; }
+        if (isPaste(text)) { count("paste"); continue; }
+        if (pendingReply !== null) {
+          out.push(pendingReply); count("kept_assistant_context"); pendingReply = null;
+        }
+        out.push(corpusRecord(record, text)); count("kept_human");
+      } else if (kind === "assistant") {
+        var vt = visibleText((record.message || {}).content);
+        if (vt) {
+          if (pendingReply !== null) count("assistant_superseded");
+          pendingReply = corpusRecord(record, vt);
+        } else {
+          count("assistant_no_visible_text");
+        }
+      } else {
+        count("other_record_type");
+      }
+    }
+    if (pendingReply !== null) count("assistant_trailing");
+    return out;
+  }
+
+  var api = {
+    SOURCE: SOURCE, MIN_HUMAN_TURNS: MIN_HUMAN_TURNS,
+    normalise: normalise, projectLabel: projectLabel,
+    sessionSlug: sessionSlug, selectSessions: selectSessions,
+    humanText: humanText, isPaste: isPaste, scrubHomePaths: scrubHomePaths
+  };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+    if (require.main === module) {
+      var fs = require("fs");
+      var argv = process.argv.slice(2);
+      if (argv[0] === "--labels") {
+        process.stdout.write(JSON.stringify(argv.slice(1).map(projectLabel)));
+      } else if (argv[0] === "--session-slugs") {
+        process.stdout.write(JSON.stringify(argv.slice(1).map(sessionSlug)));
+      } else if (argv[0] === "--select") {
+        var sel = selectSessions(JSON.parse(argv[3]), parseInt(argv[1], 10), parseInt(argv[2], 10));
+        process.stdout.write(JSON.stringify(sel.map(function (r) { return r.id; })));
+      } else {
+        var lines = fs.readFileSync(argv[0], "utf8").split("\n");
+        var recs = [];
+        for (var i = 0; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          try { var r = JSON.parse(lines[i]); if (r && typeof r === "object") recs.push(r); }
+          catch (e) { /* a truncated line is skipped, not fatal */ }
+        }
+        var st = {};
+        var recsOut = normalise(recs, st);
+        process.stdout.write(JSON.stringify({ records: recsOut, stats: st }));
+      }
+    }
+  } else {
+    root.PersonaKitNormalise = api;
+  }
+})(typeof window !== "undefined" ? window : this);
+</script>
+<script>
+(function () {
+  "use strict";
+  var N = window.PersonaKitNormalise;
+  var MAX_SESSIONS = 50, MAX_TURNS = 200;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var drop = $("drop"), picker = $("picker"), progress = $("progress");
+  var rowsEl = $("rows"), ledgerEl = $("ledger"), saveBtn = $("save"), saveStatus = $("save-status");
+  var sessions = [];   // {name, sessionId, project, humanTurns, first, last, mtime, records, checked}
+  var seen = { files: 0, jsonl: 0, sessions: 0 };
+
+  // ---- getting files out of a dropped folder ------------------------------
+  function readEntry(entry, prefix, out) {
+    return new Promise(function (resolve) {
+      if (entry.isFile) {
+        entry.file(function (f) { out.push({ file: f, path: prefix + entry.name }); resolve(); }, resolve);
+      } else if (entry.isDirectory) {
+        var reader = entry.createReader(), all = [];
+        (function more() {
+          reader.readEntries(function (batch) {
+            if (!batch.length) {
+              Promise.all(all.map(function (e) { return readEntry(e, prefix + entry.name + "/", out); })).then(resolve);
+              return;
+            }
+            all = all.concat(Array.prototype.slice.call(batch)); more();
+          }, resolve);
+        })();
+      } else resolve();
+    });
+  }
+  function filesFromDrop(dt) {
+    var out = [], items = dt.items ? Array.prototype.slice.call(dt.items) : [];
+    var entries = items.map(function (i) { return i.webkitGetAsEntry ? i.webkitGetAsEntry() : null; }).filter(Boolean);
+    if (!entries.length) {
+      return Promise.resolve(Array.prototype.slice.call(dt.files).map(function (f) { return { file: f, path: f.webkitRelativePath || f.name }; }));
+    }
+    return Promise.all(entries.map(function (e) { return readEntry(e, "", out); })).then(function () { return out; });
+  }
+  function filesFromPicker(list) {
+    return Array.prototype.slice.call(list).map(function (f) { return { file: f, path: f.webkitRelativePath || f.name }; });
+  }
+
+  // ---- streaming a big file line by line ---------------------------------
+  function readRecords(file) {
+    return new Promise(function (resolve) {
+      var records = [], rest = "";
+      var reader = file.stream().pipeThrough(new TextDecoderStream("utf-8", { fatal: false })).getReader();
+      function take(line) {
+        if (!line.trim()) return;
+        try { var r = JSON.parse(line); if (r && typeof r === "object") records.push(r); } catch (e) { /* skipped, not fatal */ }
+      }
+      (function pump() {
+        reader.read().then(function (res) {
+          if (res.done) { take(rest); resolve(records); return; }
+          var chunk = rest + res.value, nl;
+          while ((nl = chunk.indexOf("\n")) !== -1) { take(chunk.slice(0, nl)); chunk = chunk.slice(nl + 1); }
+          rest = chunk; pump();
+        }, function () { resolve(records); });
+      })();
+    });
+  }
+
+  // ---- the run -------------------------------------------------------------
+  function run(files) {
+    var jsonl = files.filter(function (f) { return /\.jsonl$/.test(f.path); }).length;
+    var found = files.map(function (f) { return { f: f, slug: N.sessionSlug(f.path) }; }).filter(function (x) { return x.slug; });
+    seen = { files: files.length, jsonl: jsonl, sessions: found.length };
+    if (!found.length) {
+      progress.textContent = "No session files found. Drop the folder at ~/.claude/projects (or ~/.claude).";
+      return;
+    }
+    sessions = [];
+    var i = 0;
+    (function next() {
+      if (i >= found.length) { finish(); return; }
+      var item = found[i++];
+      progress.textContent = "Reading " + i + " of " + found.length + " sessions&hellip;";
+      readRecords(item.f.file).then(function (records) {
+        var stats = {};
+        var out = N.normalise(records, stats);
+        var human = out.filter(function (r) { return r.type === "user"; });
+        var stamps = human.map(function (r) { return r.timestamp; }).filter(Boolean).sort();
+        var name = item.f.path.split("/").pop().replace(/\.jsonl$/, "");
+        var project = N.projectLabel(item.slug);
+        out.forEach(function (r) { r.project = project; });
+        sessions.push({
+          name: name, sessionId: name, project: project, records: out, stats: stats,
+          humanTurns: human.length, context: out.length - human.length,
+          first: stamps.length ? stamps[0].slice(0, 10) : "", last: stamps.length ? stamps[stamps.length - 1].slice(0, 10) : "",
+          mtime: item.f.file.lastModified || 0, checked: false
+        });
+        next();
+      });
+    })();
+  }
+
+  function finish() {
+    var admitted = sessions.filter(function (s) { return s.humanTurns >= N.MIN_HUMAN_TURNS; });
+    var rows = admitted.map(function (s) { return { ref: s, human_turns: s.humanTurns, mtime: s.mtime }; });
+    N.selectSessions(rows, MAX_SESSIONS, MAX_TURNS).forEach(function (r) { r.ref.checked = true; });
+    // Show in the order the rule considered them: the recency window first
+    // (newest MAX_SESSIONS), richest at the top, so the ticks cluster.
+    var inWindow = N.selectSessions(rows, MAX_SESSIONS, null).map(function (r) { return r.ref; });
+    var outside = admitted.filter(function (s) { return inWindow.indexOf(s) === -1; })
+                          .sort(function (a, b) { return b.mtime - a.mtime; });
+    admitted = inWindow.concat(outside);
+    var thin = sessions.length - admitted.length;
+    progress.textContent = seen.files.toLocaleString() + " files seen, " + seen.jsonl.toLocaleString() + " transcripts, " +
+      sessions.length + " sessions (the rest are subagent sidecars). " + admitted.length + " have at least " +
+      N.MIN_HUMAN_TURNS + " of your turns" + (thin ? "; " + thin + " were too thin to use." : ".");
+    $("selection-note").textContent = "Your richest recent sessions: of the " + MAX_SESSIONS + " most recently touched, the ones " +
+      "where you typed the most, filling up to " + MAX_TURNS + " of your turns. Corrections live in long back-and-forths, " +
+      "which is why size wins over date. Untick any session you'd rather keep out; tick one to add it.";
+    renderRows(admitted);
+    renderLedger();
+    $("s-review").hidden = false; $("s-save").hidden = false;
+    update();
+    $("s-review").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderRows(admitted) {
+    rowsEl.innerHTML = "";
+    admitted.forEach(function (s, idx) {
+      var tr = document.createElement("tr");
+      tr.className = s.checked ? "" : "off";
+      tr.innerHTML = '<td class="chk"><input type="checkbox" aria-label="include session"></td>' +
+        "<td></td><td class=\"id\"></td><td></td><td></td><td class=\"num\"></td>";
+      var cells = tr.querySelectorAll("td");
+      cells[1].textContent = s.project; cells[2].textContent = s.sessionId.slice(0, 8);
+      cells[3].textContent = s.first; cells[4].textContent = s.last; cells[5].textContent = s.humanTurns;
+      var cb = tr.querySelector("input"); cb.checked = s.checked;
+      cb.addEventListener("change", function () { s.checked = cb.checked; tr.className = s.checked ? "" : "off"; update(); });
+      rowsEl.appendChild(tr);
+    });
+  }
+
+  var LABELS = {
+    tool_result: "tool output", assistant_no_visible_text: "assistant records with nothing you saw",
+    assistant_superseded: "assistant replies you didn't answer", assistant_trailing: "assistant replies at the end of a session",
+    other_record_type: "bookkeeping records", harness: "messages from other agent sessions and injected notices",
+    paste: "pasted blocks", scaffolding_or_empty: "commands, interruptions and empty turns", sidechain: "subagent turns"
+  };
+  function renderLedger() {
+    var totals = {};
+    sessions.forEach(function (s) { Object.keys(s.stats).forEach(function (k) { totals[k] = (totals[k] || 0) + s.stats[k]; }); });
+    ledgerEl.innerHTML = "";
+    Object.keys(LABELS).forEach(function (k) {
+      if (!totals[k]) return;
+      var a = document.createElement("span"), b = document.createElement("span");
+      a.textContent = LABELS[k]; b.className = "v"; b.textContent = totals[k].toLocaleString();
+      ledgerEl.appendChild(a); ledgerEl.appendChild(b);
+    });
+  }
+
+  function chosen() { return sessions.filter(function (s) { return s.checked; }); }
+  function update() {
+    var c = chosen();
+    var turns = c.reduce(function (n, s) { return n + s.humanTurns; }, 0);
+    var ctx = c.reduce(function (n, s) { return n + s.context; }, 0);
+    $("st-turns").textContent = turns.toLocaleString();
+    $("st-sessions").textContent = c.length;
+    $("st-context").textContent = ctx.toLocaleString();
+    saveBtn.disabled = c.length === 0;
+    saveStatus.textContent = "";
+  }
+
+  // ---- saving --------------------------------------------------------------
+  function corpusText() {
+    var lines = [];
+    chosen().sort(function (a, b) { return b.mtime - a.mtime; }).forEach(function (s) {
+      s.records.forEach(function (r) { lines.push(JSON.stringify(r)); });
+    });
+    return lines.join("\n") + "\n";
+  }
+  var downloads = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("downloads").then(function (d) { downloads = d; }, function () { downloads = null; });
+  }
+  saveBtn.addEventListener("click", function () {
+    var data = corpusText(), name = "personakit-corpus.txt";   // .jsonl is not on the host's save allowlist; content is still one JSON object per line
+    saveStatus.textContent = "Saving\u2026";
+    if (downloads) {
+      downloads.save({ filename: name, data: data }).then(function () {
+        saveStatus.textContent = "Saved. Send " + name + ".";
+      }, function (err) {
+        var code = (err && err.code) || "unknown";
+        var why = {
+          declined: "You closed the save prompt. Click again when you're ready.",
+          rate_limited: "A save prompt is already open. Answer it, or wait a moment.",
+          too_large: "Over the host's 16 MB limit. Untick a few sessions and try again.",
+          rejected_extension: "The host refused the file type. This should not happen; tell us."
+        }[code] || ("Not saved (" + code + "). You can try again.");
+        saveStatus.textContent = why;
+      });
+      return;
+    }
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    saveStatus.textContent = "Saved. Send " + name + ".";
+  });
+
+  // ---- wiring --------------------------------------------------------------
+  drop.addEventListener("click", function () { picker.click(); });
+  drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); picker.click(); } });
+  picker.addEventListener("change", function () { run(filesFromPicker(picker.files)); });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    progress.textContent = "Reading&hellip;";
+    filesFromDrop(e.dataTransfer).then(run);
+  });
+})();
+</script>
+
+</body>
+</html>
